@@ -24,7 +24,7 @@ python -m pip install -e .
 
 ```bash
 python -m pip install torch==2.9.1 --index-url https://download.pytorch.org/whl/cu128
-python -m pip install 'transformers>=4.51,<5'
+python -m pip install transformers==5.19.0
 ```
 
 ## 分类
