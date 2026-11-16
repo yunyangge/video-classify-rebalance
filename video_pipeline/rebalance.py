@@ -11,6 +11,7 @@ from .audit import audit
 from .common import new_directory, write_json, export_json
 from .data import Data, prepare, read_config
 from .selection import select
+from .report import render
 
 
 def run(args):
@@ -44,6 +45,15 @@ def run(args):
                   selection_seconds=time.perf_counter() - started)
     write_json(out / "report.json", report)
     result = audit(out)
+    report.update(result)
     report["seconds"] = time.perf_counter() - started
-    write_json(out / "report.json", report | result)
-    return report | result
+    write_json(out / "report.json", report)
+    import json
+    stats = json.loads((out / "hours-summary.json").read_text())
+    quotas = json.loads((out / "quota-summary.json").read_text())["checks"]
+    quality = json.loads((out / "technical-quality.json").read_text())["checks"]
+    labels = {rule["id"]: rule.get("name", rule["id"])
+              for rules in config["rules"].values() for rule in rules}
+    render(out / "statistics.html", "均衡重采样", report, stats, labels=labels,
+           quotas=quotas, quality=quality, densities=result["density_checks"], cap=config["max_gib_per_hour"])
+    return report

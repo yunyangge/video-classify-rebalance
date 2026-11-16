@@ -79,3 +79,5 @@ python -m unittest discover -s tests -v
 ```
 
 仓库只包含代码、说明和合成数据生成器。类目、业务配额、模型、Meta 和运行输出放在外部目录。
+
+本地验证结果见 [测试记录](docs/testing.md)。

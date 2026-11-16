@@ -200,6 +200,48 @@ class SelectionTests(unittest.TestCase):
         indices = self.select([record(i) for i in range(12)], config(5))
         self.assertEqual(len(indices), 5)
 
+    def test_random_small_pools_match_exhaustive_selection(self):
+        import itertools
+        import random
+        for seed in range(12):
+            randomizer = random.Random(seed)
+            rows = [record(i, randomizer.choice([1, 2, 3, 4]),
+                           primary_id=f"topic-{i % 2}", fps=randomizer.choice([10., 30.]),
+                           height=randomizer.choice([200, 600]), width=600) for i in range(7)]
+            cfg = config(3)
+            cfg["rules"]["primary"] = [dict(id=f"topic-{i}", min_share=.5, max_share=.5) for i in range(2)]
+            cfg["technical_quality"]["resolution_shares"] = [dict(min_short_side=500, min_share=.5)]
+            density_order = sorted(range(7), key=lambda i: (-rows[i]["video_size_bytes"], -(rows[i]["width"] * rows[i]["height"]), -rows[i]["upload_timestamp"], i))
+            quality_order = sorted(range(7), key=lambda i: (-(rows[i]["width"] * rows[i]["height"]), -rows[i]["upload_timestamp"], i))
+            density_rank = {index: rank + 1 for rank, index in enumerate(density_order)}
+            quality_rank = {index: rank + 1 for rank, index in enumerate(quality_order)}
+
+            def score(indices):
+                groups = [[i for i in indices if rows[i]["primary_id"] == f"topic-{topic}"] for topic in range(2)]
+                for group in [indices] + groups:
+                    if sum(rows[i]["video_size_bytes"] / 2**30 for i in group) > 2.5 * len(group) + 1e-7:
+                        return None
+                return (abs(len(indices) - 3), sum(abs(len(group) - 1.5) for group in groups),
+                        sum(rows[i]["fps"] < 20 for i in indices),
+                        max(0, 1.5 - sum(rows[i]["height"] >= 500 for i in indices)),
+                        sum(density_rank[i] for i in indices), sum(quality_rank[i] for i in indices))
+
+            best = min(value for mask in itertools.product([0, 1], repeat=7)
+                       if (value := score([i for i, keep in enumerate(mask) if keep])) is not None)
+            self.assertEqual(score(self.select(rows, cfg)), best, f"random seed {seed}")
+
+    def test_isolated_solver_and_deadline_fallback(self):
+        from scipy.sparse import csr_matrix
+        from video_pipeline.mip import isolated
+        values, _ = isolated(np.array([-1., 0.]), csr_matrix([[1., 1.]]),
+                             np.array([1.]), np.array([1.]), np.array([0., 1.]), 5., 2)
+        self.assertEqual(values.tolist(), [1., 0.])
+        original = np.array([0., 1.])
+        values, status = isolated(np.array([-1., 0.]), csr_matrix([[1., 1.]]),
+                                  np.array([1.]), np.array([1.]), original, 0., 2)
+        self.assertEqual(values.tolist(), original.tolist())
+        self.assertIn("time_limit", status)
+
     def test_infeasible_seed_is_replaced(self):
         self.assertEqual(self.select([record(0, 4), record(1, 1)], config(1), [True, False]), [1])
 

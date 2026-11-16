@@ -161,11 +161,13 @@ def continuous(model, seconds, initial):
         high, low = np.isfinite(upper), np.isfinite(lower)
         result = linprog(cost, A_ub=vstack([matrix[high], -matrix[low]], format="csr"),
                          b_ub=np.r_[upper[high], -lower[low]], bounds=list(zip(np.zeros(len(limits)), limits)),
-                         method="highs", options={"time_limit": seconds, "threads": 8})
+                         method="highs", options={"time_limit": seconds, "threads": 8,
+                                                  "primal_feasibility_tolerance": 1e-9,
+                                                  "dual_feasibility_tolerance": 1e-9})
         phases.append(dict(phase=name, status=int(result.status)))
         if not result.success:
             if result.status != 1:
-                raise RuntimeError("Continuous solver failed: " + result.message)
+                raise RuntimeError(f"Continuous solver failed at {name}: " + result.message)
             if result.x is not None and feasible(result.x, matrix, lower, upper, limits) and cost @ result.x <= cost @ current + 1e-7:
                 current = result.x
             break
