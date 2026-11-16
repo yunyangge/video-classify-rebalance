@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="zh-CN"><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>视频 Meta 统计</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#f3f6fa;color:#1d334b;font:15px/1.6 system-ui,sans-serif}main{max-width:1120px;margin:auto;padding:36px 22px}h1{font-size:30px;margin:0}h2{font-size:19px;margin:0 0 16px}p{color:#63768c;margin:5px 0 22px}.cards,.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}.cards{grid-template-columns:repeat(4,1fr);margin:24px 0}section,.card{background:white;border:1px solid #dce5ee;border-radius:12px;padding:22px}.card strong{font-size:28px;display:block}.card span,small{color:#63768c}.wide{margin:18px 0}.row{margin:18px 0}.caption{display:flex;justify-content:space-between;gap:12px;margin-bottom:5px}.track{height:12px;background:#edf2f7;border-radius:6px;position:relative}.fill{height:100%;background:#199b91;border-radius:6px}.mark{position:absolute;top:-4px;height:20px;border-left:2px dashed #3358b8}.bad{color:#c04845}.good{color:#138579}select,button{font:inherit;padding:7px 12px;border:1px solid #d5dfe9;border-radius:7px;background:white;color:inherit}button{cursor:pointer;margin:0 8px 8px 0}header small{color:#138579;text-transform:uppercase;letter-spacing:1px}@media(max-width:700px){.grid{grid-template-columns:1fr}.cards{grid-template-columns:repeat(2,1fr)}main{padding:24px 14px}.caption{font-size:13px}}
+</style><main><header><small>Video Metadata</small><h1 id="title"></h1><p>按视频小时查看分布、目标和技术指标</p></header>
+<div class="cards" id="cards"></div>
+<div class="grid" id="checks"></div>
+<section class="wide"><h2>分类分布 <select id="dimension"></select></h2><div id="distribution"></div></section>
+<section class="wide"><h2>下载详细数据</h2><div id="downloads"></div><small>图中分布比例按实际小时计算，目标比例按固定目标小时计算。</small></section>
+</main><script>
+const DATA=__DATA__;
+const byId=id=>document.getElementById(id), text=(el,value)=>el.textContent=value;
+const fmt=n=>Number(n||0).toLocaleString(undefined,{maximumFractionDigits:2});
+const pct=n=>fmt(100*n)+'%';
+text(byId('title'),DATA.title);document.title=DATA.title;
+const card=(label,value)=>{const el=document.createElement('div');el.className='card';const s=document.createElement('span'),v=document.createElement('strong');text(s,label);text(v,value);el.append(s,v);byId('cards').append(el)};
+card('视频数',fmt(DATA.stats.videos));card('有效时长（小时）',fmt(DATA.stats.hours));
+if(DATA.report.target_hours){card('目标时长（小时）',fmt(DATA.report.target_hours));card('结果',DATA.report.passed?'全部达标':'查看目标差距')}
+else{card('缺失或无效时长',fmt(DATA.stats.missing_duration_rows));card('向量维数',fmt(DATA.report.dimensions))}
+function bar(parent,label,value,maxValue,detail,minimum=null,passed=true){
+ const row=document.createElement('div');row.className='row';const caption=document.createElement('div');caption.className='caption';
+ const name=document.createElement('span'),val=document.createElement('strong');text(name,label);text(val,detail);if(!passed)val.className='bad';caption.append(name,val);
+ const track=document.createElement('div');track.className='track';const fill=document.createElement('div');fill.className='fill';fill.style.width=Math.min(100,maxValue?value/maxValue*100:0)+'%';if(!passed)fill.style.background='#ca6963';track.append(fill);
+ if(minimum!==null){const marker=document.createElement('span');marker.className='mark';marker.style.left=Math.min(100,maxValue?minimum/maxValue*100:0)+'%';track.append(marker)}
+ row.append(caption,track);parent.append(row);return row;
+}
+function panel(title){const s=document.createElement('section'),h=document.createElement('h2');text(h,title);s.append(h);byId('checks').append(s);return s}
+if(DATA.quotas.length){const p=panel('时长目标与类目配额');for(const r of DATA.quotas){const max=Math.max(r.hours,r.max_hours||r.min_hours,1)*1.1;const label=r.dimension==='total'?'总时长':DATA.labels[r.id]||r.id;const row=bar(p,label,r.hours,max,fmt(r.hours)+' h',r.min_hours,r.passed);const note=document.createElement('small');text(note,'目标 '+fmt(r.min_hours)+' — '+(r.max_hours===null?'不限':fmt(r.max_hours))+' h；不足 '+fmt(r.below_hours)+' h，超额 '+fmt(r.above_hours)+' h');row.append(note)}}
+if(DATA.densities.length){const p=panel('平均存储密度');for(const r of DATA.densities){bar(p,r.dimension==='total'?'总体':DATA.labels[r.id]||r.id,r.gib_per_hour||0,Math.max(DATA.cap,r.gib_per_hour||0)*1.1,fmt(r.gib_per_hour)+' GiB/h',DATA.cap,r.passed)}}
+if(DATA.quality.length){const p=panel('技术指标');for(const r of DATA.quality){const resolution=r.required_min_share!==null;const value=resolution?r.qualified_hours/DATA.report.target_hours:1-r.failed_video_ratio;const row=bar(p,r.label,value,Math.max(value,resolution?r.required_min_share:1)*1.1,pct(value),resolution?r.required_min_share:1,r.passed);const note=document.createElement('small');text(note,resolution?'最低 '+pct(r.required_min_share):'未达标 '+fmt(r.failed_videos)+' 条；未知 '+fmt(r.unknown_videos)+' 条');row.append(note)}}
+const names={primary:'一级类目',secondary:'二级类目',production_form:'制作形态',language:'语种'};
+for(const key of Object.keys(DATA.stats.dimensions)){const option=document.createElement('option');option.value=key;text(option,names[key]||key);byId('dimension').append(option)}
+function plot(){const area=byId('distribution');area.replaceChildren();const rows=[...(DATA.stats.dimensions[byId('dimension').value]||[])].sort((a,b)=>b.hours-a.hours);const maximum=Math.max(1,...rows.map(r=>r.hours));for(const r of rows){bar(area,DATA.labels[r.id]||r.id||'未分类',r.hours,maximum,fmt(r.hours)+' h · '+pct(DATA.stats.hours?r.hours/DATA.stats.hours:0))}}
+byId('dimension').onchange=plot;plot();
+for(const [name,value] of Object.entries({'hours-summary.json':DATA.stats,'report.json':DATA.report,'quota-summary.json':DATA.quotas,'technical-quality.json':DATA.quality})){const button=document.createElement('button');text(button,name);button.onclick=()=>{const link=document.createElement('a');link.href=URL.createObjectURL(new Blob([JSON.stringify(value,null,2)],{type:'application/json'}));link.download=name;link.click();setTimeout(()=>URL.revokeObjectURL(link.href),1000)};byId('downloads').append(button)}
+</script></html>

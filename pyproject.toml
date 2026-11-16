@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "video-classify-rebalance"
+version = "0.1.0"
+description = "Video metadata classification and hour-based balanced selection"
+requires-python = ">=3.10"
+dependencies = ["numpy==2.2.6", "pyarrow==25.0.1", "duckdb==1.5.6", "scipy==1.15.3"]
+
+[project.scripts]
+video-pipeline = "video_pipeline.__main__:main"
+
+[tool.setuptools.packages.find]
+include = ["video_pipeline*"]
+
+[tool.setuptools.package-data]
+video_pipeline = ["dashboard.html"]
