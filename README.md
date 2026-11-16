@@ -2,6 +2,8 @@
 
 对一份视频 Meta 做内容分类，再按时长、类目和技术要求选出交付名单。输入是 Parquet；输出包含 Parquet、JSON 和可离线打开的统计 HTML。
 
+给编码助手的操作说明见 [SKILL.md](SKILL.md)。
+
 ```mermaid
 flowchart LR
   A[视频 Meta] --> B[整组 tag 编码一次]
